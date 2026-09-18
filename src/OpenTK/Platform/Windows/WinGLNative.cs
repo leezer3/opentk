@@ -68,6 +68,7 @@ namespace OpenTK.Platform.Windows
         private bool invisible_since_creation; // Set by WindowsMessage.CREATE and consumed by Visible = true (calls BringWindowToFront).
         private int suppress_resize; // Used in WindowBorder and WindowState in order to avoid rapid, consecutive resize events.
         private bool is_in_modal_loop; // set to true whenever we enter the modal resize/move event loop
+        private bool use_virtual_keys;
 
         private Rectangle
             bounds = new Rectangle(),
@@ -129,6 +130,8 @@ namespace OpenTK.Platform.Windows
                     scale_y = ScaleY(y);
                 }
 
+                use_virtual_keys = (options & GameWindowFlags.UseVirtualKeys) == GameWindowFlags.UseVirtualKeys;
+
                 window = new WinWindowInfo(
                     CreateWindow(
                         scale_x, scale_y, scale_width, scale_height,
@@ -141,7 +144,11 @@ namespace OpenTK.Platform.Windows
             }
         }
 
-        private enum ScaleDirection { X, Y }
+        private enum ScaleDirection
+        {
+            X,
+            Y
+        }
 
         // Scales a value according according
         // to the DPI of the specified direction
@@ -620,13 +627,16 @@ namespace OpenTK.Platform.Windows
             // Win95 does not distinguish left/right key constants (GetAsyncKeyState returns 0).
             // In this case, both keys will be reported as pressed.
 
-            bool extended = (lParam.ToInt64() & ExtendedBit) != 0;
+            bool extended0 = (lParam.ToInt64() & ExtendedBit) != 0;
             short scancode = (short)((lParam.ToInt64() >> 16) & 0xff);
             //ushort repeat_count = unchecked((ushort)((ulong)lParam.ToInt64() & 0xffffu));
             VirtualKeys vkey = (VirtualKeys)wParam;
+            
             bool is_valid;
-            Key key = WinKeyMap.TranslateKey(scancode, vkey, extended, false, out is_valid);
-
+            Key key = use_virtual_keys ? 
+                    WinKeyMap.TranslateVKey(scancode, vkey, extended0, out is_valid) :
+                    WinKeyMap.TranslateKey(scancode, vkey, extended0, false, out is_valid);
+            
             if (is_valid)
             {
                 if (pressed)
